@@ -1,6 +1,12 @@
 [build]
-builder = "NIXPACKS"
+# Prefer Dockerfile (Node 22.13+) so node:sqlite works for SqliteLocalAgentStore.
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
 
 [deploy]
 startCommand = "npx --yes @grok/agent-sdk@0.5.0 serve --dir . --mode single --host 0.0.0.0 --port $PORT"
 restartPolicyType = "ON_FAILURE"
+
+[variables]
+# Fallback if the service is switched back to Nixpacks.
+NIXPACKS_NODE_VERSION = "22"

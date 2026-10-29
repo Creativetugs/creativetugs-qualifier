@@ -1,0 +1,8 @@
+node_modules
+.agent-serve
+.git
+.env
+.env.*
+memory
+*.md
+!AGENTS.md
