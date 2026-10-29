@@ -173,7 +173,7 @@ form.addEventListener('submit', async (e) => {
     const data = await res.json();
     working.remove();
     if (!res.ok || data.ok === false) {
-      add('error', data.error || data.message || ('Request failed (' + res.status + ')'));
+      add('error', data.reply || data.message || data.error || ('Request failed (' + res.status + ')'));
     } else {
       sessionId = data.sessionId;
       localStorage.setItem('ct_session', sessionId);
@@ -210,6 +210,8 @@ const server = http.createServer(async (req, res) => {
       ok: true,
       runtime: "chat-server",
       openaiKey: Boolean(apiKey),
+      openaiKeyShape: keyInfo.shape,
+      openaiKeyHint: keyInfo.hint || null,
       model,
     });
   }
@@ -252,13 +254,22 @@ const server = http.createServer(async (req, res) => {
         playgroundUrl: `/playground`,
       });
     } catch (err) {
-      console.error("[creativetugs-qualifier] turn error:", err?.message || err);
+      const detail = String(err?.message || err);
+      console.error("[creativetugs-qualifier] turn error:", detail);
+      const hint =
+        keyInfo.hint ||
+        (/incorrect api key|invalid.*api key|authentication/i.test(detail)
+          ? "Check Railway OPENAI_API_KEY is a real OpenAI sk-… key (not CURSOR_API_KEY)."
+          : /model/i.test(detail)
+            ? "Check OPENAI_MODEL (default gpt-4o-mini)."
+            : null);
+      const userFacing = hint ? `${detail}\n\n${hint}` : detail;
       return json(res, 200, {
         ok: false,
         sessionId,
         error: "turn_failed",
-        message: String(err?.message || err),
-        reply: `Sorry — I hit an error: ${err?.message || err}`,
+        message: userFacing,
+        reply: `Sorry — I hit an error:\n${userFacing}`,
       });
     }
   }
