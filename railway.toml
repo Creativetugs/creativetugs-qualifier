@@ -1,14 +1,13 @@
 [build]
-# Prefer Dockerfile (Node 22.13+) so node:sqlite works for SqliteLocalAgentStore.
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-# Prefer clearing Custom Start Command in Railway UI so Dockerfile CMD runs.
-# This startCommand also uses the Jsonl sqlite shim + PORT from env.
+# MUST be serve.mjs — do NOT use `npx @grok/agent-sdk serve` (segfaults on sqlite).
+# In Railway UI: set Custom Start Command to exactly: node scripts/serve.mjs
+# or clear it so this / Dockerfile CMD applies.
 startCommand = "node scripts/serve.mjs"
 restartPolicyType = "ON_FAILURE"
 
 [variables]
-# Fallback if the service is switched back to Nixpacks.
 NIXPACKS_NODE_VERSION = "22"
