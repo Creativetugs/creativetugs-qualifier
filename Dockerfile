@@ -1,5 +1,6 @@
-# Agent SDK requires Node >= 22.13 for built-in node:sqlite (SqliteLocalAgentStore).
-FROM node:22.13-bookworm-slim
+# Full bookworm (not slim): Agent SDK pulls node:sqlite via SqliteLocalAgentStore;
+# slim images have segfaulted on Railway. We also shim SQLite → Jsonl at runtime.
+FROM node:22.13-bookworm
 
 WORKDIR /app
 
@@ -9,7 +10,8 @@ RUN npm ci --omit=dev
 COPY . .
 
 ENV NODE_ENV=production
-# Railway sets PORT; bind all interfaces for the container network.
+ENV USE_JSONL_AGENT_STORE=1
 EXPOSE 3000
 
-CMD ["sh", "-c", "node scripts/check-env.mjs && npx --yes @grok/agent-sdk@0.5.0 serve --dir . --mode single --host 0.0.0.0 --port ${PORT:-3000} ${PUBLIC_URL:+--public-url \"$PUBLIC_URL\"}"]
+# scripts/serve.mjs expands PORT and loads the Jsonl sqlite shim.
+CMD ["node", "scripts/serve.mjs"]

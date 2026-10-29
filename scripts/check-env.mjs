@@ -36,3 +36,6 @@ if (!hasKey) {
   );
   process.exit(1);
 }
+
+// Imported by serve.mjs — do not keep going into CLI when used as a side-effect import.
+
