@@ -9,8 +9,8 @@
   "scripts": {
     "check": "tsc --noEmit",
     "dev": "agent-sdk dev",
-    "start": "sh -c 'npx --yes @grok/agent-sdk@0.5.0 serve --dir . --mode single --host 0.0.0.0 --port ${PORT:-3000}'",
-    "prestart": "node -e \"const [maj,min]=process.versions.node.split('.').map(Number); if(maj<22||(maj===22&&min<13)){console.error('Agent SDK needs Node >= 22.13 (got '+process.versions.node+').'); process.exit(1)}\""
+    "start": "sh -c 'node scripts/check-env.mjs && npx --yes @grok/agent-sdk@0.5.0 serve --dir . --mode single --host 0.0.0.0 --port ${PORT:-3000} ${PUBLIC_URL:+--public-url \"$PUBLIC_URL\"}'",
+    "prestart": "node scripts/check-env.mjs"
   },
   "dependencies": {
     "@grok/agent-sdk": "^0.5.0",

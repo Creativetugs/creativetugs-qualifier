@@ -12,4 +12,4 @@ ENV NODE_ENV=production
 # Railway sets PORT; bind all interfaces for the container network.
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx --yes @grok/agent-sdk@0.5.0 serve --dir . --mode single --host 0.0.0.0 --port ${PORT:-3000}"]
+CMD ["sh", "-c", "node scripts/check-env.mjs && npx --yes @grok/agent-sdk@0.5.0 serve --dir . --mode single --host 0.0.0.0 --port ${PORT:-3000} ${PUBLIC_URL:+--public-url \"$PUBLIC_URL\"}"]

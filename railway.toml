@@ -6,7 +6,7 @@ dockerfilePath = "Dockerfile"
 [deploy]
 # Must go through a shell so ${PORT} expands (Railway injects PORT).
 # Prefer clearing any Custom Start Command in the Railway UI so Dockerfile CMD is used.
-startCommand = "sh -c 'npx --yes @grok/agent-sdk@0.5.0 serve --dir . --mode single --host 0.0.0.0 --port ${PORT:-3000}'"
+startCommand = "sh -c 'node scripts/check-env.mjs && npx --yes @grok/agent-sdk@0.5.0 serve --dir . --mode single --host 0.0.0.0 --port ${PORT:-3000} ${PUBLIC_URL:+--public-url \"$PUBLIC_URL\"}'"
 restartPolicyType = "ON_FAILURE"
 
 [variables]
