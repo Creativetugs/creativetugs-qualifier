@@ -7,10 +7,9 @@
  * qualifier tools/flow via OpenAI Chat Completions — no @cursor/sdk.
  *
  * Env:
- *   OPENAI_API_KEY (required)
- *   OPENAI_MODEL (optional, default gpt-4.1-mini)
+ *   OPENAI_API_KEY (required) — must be an OpenAI key from platform.openai.com (sk-…)
+ *   OPENAI_MODEL (optional, default gpt-4o-mini)
  *   PORT (Railway)
- *   PUBLIC_CHAT (unused here; server is public by design for marketing iframe)
  */
 import http from "node:http";
 import { randomBytes } from "node:crypto";
@@ -22,20 +21,42 @@ import { runOpenAITurn } from "./chat-lib.mjs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
 const port = Number(process.env.PORT?.trim() || 3000);
-const model = process.env.OPENAI_MODEL?.trim() || "gpt-4.1-mini";
+const model = process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini";
 const apiKey = process.env.OPENAI_API_KEY?.trim();
+
+function describeKeyShape(key) {
+  if (!key) return { present: false, shape: "missing" };
+  if (key.startsWith("sk-")) return { present: true, shape: "openai_sk" };
+  if (key.startsWith("key_")) {
+    return {
+      present: true,
+      shape: "cursor_key_",
+      hint: "OPENAI_API_KEY looks like a Cursor key (key_…). Use an OpenAI API key (sk-…) from https://platform.openai.com/api-keys — not CURSOR_API_KEY.",
+    };
+  }
+  return {
+    present: true,
+    shape: "unknown",
+    hint: "OPENAI_API_KEY does not start with sk-. OpenAI keys usually look like sk-…",
+  };
+}
+
+const keyInfo = describeKeyShape(apiKey);
 
 console.error("[creativetugs-qualifier] *** CHAT_SERVER_ENTRY=scripts/chat-server.mjs ***");
 console.error(`[creativetugs-qualifier] node=${process.versions.node}`);
 console.error(
-  `[creativetugs-qualifier] OPENAI_API_KEY=${apiKey ? "set" : "MISSING"} model=${model}`,
+  `[creativetugs-qualifier] OPENAI_API_KEY=${keyInfo.present ? "set" : "MISSING"} shape=${keyInfo.shape} model=${model}`,
 );
 
 if (!apiKey) {
   console.error(
-    "[creativetugs-qualifier] Set Railway variable OPENAI_API_KEY. Agent SDK serve is not used on Railway (SIGSEGV).",
+    "[creativetugs-qualifier] Set Railway variable OPENAI_API_KEY to an OpenAI sk-… key (platform.openai.com).",
   );
   process.exit(1);
+}
+if (keyInfo.hint) {
+  console.error(`[creativetugs-qualifier] WARNING: ${keyInfo.hint}`);
 }
 
 let systemPrompt = "";
