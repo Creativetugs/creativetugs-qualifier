@@ -395,12 +395,18 @@ export async function runOpenAITurn({ apiKey, model, system, history, userMessag
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const msg =
+      const apiMsg =
         body?.error?.message ||
+        body?.error?.code ||
         body?.message ||
-        `OpenAI HTTP ${res.status}`;
+        null;
+      const msg = apiMsg
+        ? `OpenAI ${res.status}: ${apiMsg}`
+        : `OpenAI HTTP ${res.status}`;
       const err = new Error(msg);
       err.status = res.status;
+      err.openaiCode = body?.error?.code;
+      err.openaiType = body?.error?.type;
       throw err;
     }
     const choice = body.choices?.[0]?.message;
