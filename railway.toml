@@ -3,10 +3,9 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-# MUST be serve.mjs — do NOT use `npx @grok/agent-sdk serve` (segfaults on sqlite).
-# In Railway UI: set Custom Start Command to exactly: node scripts/serve.mjs
-# or clear it so this / Dockerfile CMD applies.
-startCommand = "node scripts/serve.mjs"
+# Railway production uses OpenAI chat-server (Agent SDK serve SIGSEGVs here).
+# Custom Start Command: node scripts/chat-server.mjs
+startCommand = "node scripts/chat-server.mjs"
 restartPolicyType = "ON_FAILURE"
 
 [variables]
