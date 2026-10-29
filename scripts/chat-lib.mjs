@@ -8,7 +8,7 @@ export const SERVICES = [
   "Marketing Automation",
   "CRM Solutions",
   "Custom Development",
-  "Design/developer/automation AI agents",
+  "Design, developer, and automation AI agents",
 ];
 
 export const BOOKING_URL = "https://calendly.com/creativetugs/30min";

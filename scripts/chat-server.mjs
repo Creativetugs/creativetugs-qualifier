@@ -13,10 +13,10 @@
  */
 import http from "node:http";
 import { randomBytes } from "node:crypto";
-import { readFileSync, existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { readFileSync, existsSync, createReadStream, statSync } from "node:fs";
+import { dirname, join, extname, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
-import { runOpenAITurn } from "./chat-lib.mjs";
+import { runOpenAITurn, SERVICES } from "./chat-lib.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
@@ -101,48 +101,238 @@ function readBody(req) {
   });
 }
 
+const SERVICES_JSON = JSON.stringify(SERVICES);
+
 const PLAYGROUND_HTML = `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b0b0b" />
   <title>Creative Tugs — Project advisor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
-    :root { color-scheme: light; --bg:#f6f3ee; --ink:#1c1917; --accent:#0f766e; --card:#fff; --muted:#78716c; }
+    :root {
+      color-scheme: dark;
+      --bg: #0b0b0b;
+      --bg-elevated: #141414;
+      --bg-chat: #111111;
+      --ink: #ffffff;
+      --muted: #a3a3a3;
+      --line: #2a2a2a;
+      --accent: #fe7a47;
+      --accent-2: #ff9a6b;
+      --teal: #82c0c7;
+      --danger: #ff8a80;
+      --radius: 14px;
+      --font-display: "Montserrat", system-ui, sans-serif;
+      --font-body: "Poppins", system-ui, sans-serif;
+    }
     * { box-sizing: border-box; }
-    body { margin:0; font-family: "Segoe UI", system-ui, sans-serif; background:linear-gradient(160deg,#f6f3ee,#e7e5e4); color:var(--ink); min-height:100vh; }
-    main { max-width:720px; margin:0 auto; padding:1.25rem; display:flex; flex-direction:column; height:100vh; }
-    header h1 { font-size:1.25rem; margin:0 0 .25rem; }
-    header p { margin:0 0 1rem; color:var(--muted); font-size:.95rem; }
-    #log { flex:1; overflow:auto; background:var(--card); border-radius:12px; padding:1rem; box-shadow:0 1px 3px rgba(0,0,0,.08); }
-    .msg { margin:0 0 .85rem; line-height:1.45; white-space:pre-wrap; }
-    .msg.user { color:#44403c; }
-    .msg.assistant { border-left:3px solid var(--accent); padding-left:.75rem; }
-    .msg.error { color:#b91c1c; }
-    .msg.meta { color:var(--muted); font-size:.85rem; }
-    form { display:flex; gap:.5rem; margin-top:1rem; }
-    input { flex:1; padding:.75rem .9rem; border:1px solid #d6d3d1; border-radius:10px; font-size:1rem; }
-    button { background:var(--accent); color:#fff; border:0; border-radius:10px; padding:.75rem 1rem; font-weight:600; cursor:pointer; }
-    button:disabled { opacity:.6; cursor:wait; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: var(--font-body);
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 500px at 10% -10%, rgba(254,122,71,.18), transparent 55%),
+        radial-gradient(900px 420px at 100% 0%, rgba(130,192,199,.12), transparent 50%),
+        var(--bg);
+      min-height: 100vh;
+    }
+    main {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 1.1rem 1rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      gap: .85rem;
+    }
+    header.brand {
+      display: flex;
+      align-items: center;
+      gap: .9rem;
+      padding: .35rem .15rem .2rem;
+    }
+    header.brand img {
+      width: 72px;
+      height: auto;
+      display: block;
+      flex-shrink: 0;
+    }
+    header.brand .copy { min-width: 0; }
+    header.brand .eyebrow {
+      font-family: var(--font-display);
+      font-size: .68rem;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--teal);
+      margin: 0 0 .2rem;
+      font-weight: 600;
+    }
+    header.brand h1 {
+      font-family: var(--font-display);
+      font-size: clamp(1.15rem, 2.5vw, 1.45rem);
+      font-weight: 700;
+      letter-spacing: .02em;
+      margin: 0;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+    header.brand h1 span { color: var(--accent); }
+    header.brand p {
+      margin: .28rem 0 0;
+      color: var(--muted);
+      font-size: .92rem;
+      line-height: 1.35;
+    }
+    .services {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .4rem;
+    }
+    .services button {
+      font-family: var(--font-body);
+      font-size: .72rem;
+      font-weight: 500;
+      color: var(--ink);
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: .35rem .7rem;
+      cursor: pointer;
+      transition: border-color .15s, background .15s, color .15s;
+    }
+    .services button:hover {
+      border-color: var(--accent);
+      color: var(--accent-2);
+      background: rgba(254,122,71,.08);
+    }
+    #log {
+      flex: 1;
+      overflow: auto;
+      background: linear-gradient(180deg, rgba(20,20,20,.95), rgba(12,12,12,.98));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1rem 1rem 1.1rem;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
+    }
+    .msg {
+      margin: 0 0 .95rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      font-size: .95rem;
+    }
+    .msg.user {
+      color: #f5f5f5;
+      background: rgba(130,192,199,.1);
+      border: 1px solid rgba(130,192,199,.25);
+      border-radius: 12px 12px 4px 12px;
+      padding: .7rem .85rem;
+      margin-left: 12%;
+    }
+    .msg.assistant {
+      color: #fafafa;
+      border-left: 3px solid var(--accent);
+      padding: .15rem 0 .15rem .85rem;
+      margin-right: 6%;
+    }
+    .msg.error {
+      color: var(--danger);
+      border: 1px solid rgba(255,138,128,.35);
+      background: rgba(255,138,128,.08);
+      border-radius: 10px;
+      padding: .7rem .85rem;
+    }
+    .msg.meta { color: var(--muted); font-size: .82rem; }
+    form.composer {
+      display: flex;
+      gap: .55rem;
+      align-items: stretch;
+      background: var(--bg-elevated);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: .35rem .35rem .35rem .95rem;
+    }
+    form.composer input {
+      flex: 1;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--ink);
+      font-family: var(--font-body);
+      font-size: .98rem;
+      min-width: 0;
+    }
+    form.composer input::placeholder { color: #737373; }
+    form.composer button[type="submit"] {
+      font-family: var(--font-display);
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      font-size: .78rem;
+      border: 0;
+      border-radius: 999px;
+      padding: .78rem 1.15rem;
+      cursor: pointer;
+      color: #0b0b0b;
+      background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    }
+    form.composer button[type="submit"]:disabled { opacity: .55; cursor: wait; }
+    footer.note {
+      color: var(--muted);
+      font-size: .72rem;
+      text-align: center;
+    }
+    footer.note a { color: var(--teal); }
+    @media (max-width: 560px) {
+      header.brand img { width: 58px; }
+      .msg.user { margin-left: 4%; }
+    }
   </style>
 </head>
 <body>
 <main>
-  <header>
-    <h1>Creative Tugs project advisor</h1>
-    <p>We build the systems. You run the business.</p>
+  <header class="brand">
+    <img src="/public/logo.png" width="72" height="47" alt="Creative Tugs" />
+    <div class="copy">
+      <p class="eyebrow">Project advisor</p>
+      <h1>Creative <span>Tugs</span></h1>
+      <p>We build the systems. You run the business.</p>
+    </div>
   </header>
+  <div class="services" id="services" aria-label="Services"></div>
   <div id="log" aria-live="polite"></div>
-  <form id="f">
+  <form class="composer" id="f">
     <input id="m" autocomplete="off" placeholder="Hi — I need a new website…" />
     <button type="submit">Send</button>
   </form>
+  <footer class="note">
+    High-end websites, apps, integrations &amp; AI agents ·
+    <a href="https://calendly.com/creativetugs/30min" target="_blank" rel="noopener">Book 30 min</a>
+  </footer>
 </main>
 <script>
+const SERVICES = ${SERVICES_JSON};
 const log = document.getElementById('log');
 const form = document.getElementById('f');
 const input = document.getElementById('m');
+const servicesEl = document.getElementById('services');
 let sessionId = localStorage.getItem('ct_session') || '';
+
+SERVICES.forEach((name) => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.textContent = name;
+  b.addEventListener('click', () => {
+    input.value = 'I am interested in: ' + name;
+    input.focus();
+  });
+  servicesEl.appendChild(b);
+});
 
 function add(role, text) {
   const el = document.createElement('div');
@@ -188,7 +378,7 @@ form.addEventListener('submit', async (e) => {
   }
 });
 
-add('meta', 'Ask about websites, apps, integrations, or book a discovery call.');
+add('meta', 'Tell us what you need — websites, apps, integrations, CRM, automation, or AI agents.');
 </script>
 </body>
 </html>`;
@@ -203,6 +393,30 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/playground")) {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     return res.end(PLAYGROUND_HTML);
+  }
+
+  if (req.method === "GET" && url.pathname.startsWith("/public/")) {
+    const rel = normalize(url.pathname.slice("/public/".length));
+    if (rel.includes("..")) {
+      return json(res, 400, { ok: false, error: "bad_path" });
+    }
+    const filePath = join(root, "public", rel);
+    if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+      return json(res, 404, { ok: false, error: "not_found" });
+    }
+    const types = {
+      ".png": "image/png",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".svg": "image/svg+xml",
+      ".webp": "image/webp",
+      ".ico": "image/x-icon",
+    };
+    res.writeHead(200, {
+      "content-type": types[extname(filePath).toLowerCase()] || "application/octet-stream",
+      "cache-control": "public, max-age=86400",
+    });
+    return createReadStream(filePath).pipe(res);
   }
 
   if (req.method === "GET" && url.pathname === "/health") {
